@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::{info, warn};
-use std::path::{Path, PathBuf};
 use std::future::Future;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 /// Command line tool to remove letterboxing from images
@@ -27,32 +27,33 @@ struct Args {
 async fn main() -> Result<()> {
     // Initialize logging
     env_logger::init();
-    
+
     // Parse command line arguments
     let args = Args::parse();
-    
+
     // Check if input path exists
     if !args.input.exists() {
         anyhow::bail!("Input path does not exist: {}", args.input.display());
     }
-    
+
     // Process single file or directory
     if args.input.is_file() {
         process_file(&args.input, args.threshold).await?;
     } else if args.input.is_dir() {
         process_directory(&args.input, args.recursive, args.threshold).await?;
     }
-    
+
     Ok(())
 }
 
 /// Create a processor function that owns the threshold value
-fn create_processor<'a>(threshold: u8) -> impl for<'r> FnOnce(&'r Path) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> + Send + 'a {
+fn create_processor<'a>(
+    threshold: u8,
+) -> impl for<'r> FnOnce(&'r Path) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> + Send + 'a
+{
     move |path: &Path| {
         let path = path.to_owned();
-        Box::pin(async move {
-            imx::remove_letterbox_with_threshold(&path, threshold).await
-        })
+        Box::pin(async move { imx::remove_letterbox_with_threshold(&path, threshold).await })
     }
 }
 
@@ -72,9 +73,10 @@ async fn process_file(path: &Path, threshold: u8) -> Result<()> {
     }
 
     info!("Processing image file: {}", path.display());
-    imx::remove_letterbox_with_threshold(path, threshold).await
+    imx::remove_letterbox_with_threshold(path, threshold)
+        .await
         .with_context(|| format!("Failed to process image file: {}", path.display()))?;
-    
+
     Ok(())
 }
 
@@ -82,14 +84,15 @@ async fn process_file(path: &Path, threshold: u8) -> Result<()> {
 async fn process_directory(dir: &Path, recursive: bool, threshold: u8) -> Result<()> {
     async fn process_directory_inner(dir: PathBuf, recursive: bool, threshold: u8) -> Result<()> {
         info!("Processing directory: {}", dir.display());
-        
+
         let mut entries = tokio::fs::read_dir(&dir)
             .await
             .with_context(|| format!("Failed to read directory: {}", dir.display()))?;
-            
-        while let Some(entry) = entries.next_entry()
+
+        while let Some(entry) = entries
+            .next_entry()
             .await
-            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))? 
+            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))?
         {
             let path = entry.path();
             if path.is_file() {
@@ -99,19 +102,19 @@ async fn process_directory(dir: &Path, recursive: bool, threshold: u8) -> Result
                 fut.await?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     process_directory_inner(dir.to_owned(), recursive, threshold).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{GenericImageView, ImageBuffer, Rgba};
     use std::fs;
     use tempfile::TempDir;
-    use image::{ImageBuffer, Rgba, GenericImageView};
 
     fn create_test_image(path: &Path, width: u32, height: u32, with_letterbox: bool) -> Result<()> {
         let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
@@ -119,7 +122,7 @@ mod tests {
         // Fill the image with white pixels
         for y in 0..height {
             for x in 0..width {
-                let pixel = if with_letterbox && (y < height/4 || y > height*3/4) {
+                let pixel = if with_letterbox && (y < height / 4 || y > height * 3 / 4) {
                     Rgba([0, 0, 0, 255]) // Black letterbox
                 } else {
                     Rgba([255, 255, 255, 255]) // White content
@@ -185,7 +188,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_directory() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        
+
         // Create test images in root directory
         let img1 = temp_dir.path().join("test1.png");
         let img2 = temp_dir.path().join("test2.png");
