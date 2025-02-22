@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::{info, warn};
